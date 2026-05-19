@@ -73,8 +73,10 @@ MCP server using the official `mcp` Python SDK (stdio transport). Registers all 
 
 ```python
 class Exon(BaseModel):
-    stable_id: str
+    stable_id: str                        # exon stable ID (ENSE...)
     stable_id_version: int
+    transcript_stable_id: str             # parent transcript stable ID
+    transcript_stable_id_version: int
     assembly: str             # which genome build this exon belongs to
     order: int                # 1-based exon number
     loc_region: str
@@ -92,8 +94,11 @@ class Gene(BaseModel):
     assembly: str
 
 class Translation(BaseModel):
-    stable_id: str
+    stable_id: str                        # protein stable ID (ENSP...)
     stable_id_version: int
+    transcript_stable_id: str             # parent transcript stable ID
+    transcript_stable_id_version: int
+    assembly: str
 
 class Transcript(BaseModel):
     stable_id: str
@@ -142,6 +147,8 @@ class TranscriptDiff(BaseModel):
 
 All tools accept `assembly` defaulting to `"GRCh38"`. Accepted values: `"GRCh37"`, `"GRCh38"`, or `"both"`. When `"both"` is specified, the tool fans out requests to both assemblies in parallel and returns combined results, with each record's `assembly` field indicating its origin. For tools that return a single object (e.g., `get_transcript`), specifying `"both"` returns a list with up to two entries (one per assembly).
 
+**Stable ID invariant:** Every response object — including nested `Exon` and `Translation` records — MUST carry both `stable_id` and `stable_id_version` for itself, plus `transcript_stable_id` and `transcript_stable_id_version` for child objects (Exon, Translation). No processing step (deduplication, coordinate normalization, assembly fan-out) may drop these fields.
+
 ### `get_transcript`
 Retrieve a single transcript by stable ID, with full exon structure, CDS boundaries, UTR sequences, associated genes, and protein accession.
 
@@ -170,7 +177,7 @@ Retrieve all transcripts associated with a gene symbol or Ensembl gene ID.
 Fetch the cDNA sequence for a transcript.
 
 - **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
-- **Returns:** `{ "stable_id": str, "assembly": str, "sequence": str }` or `list[...]` when `"both"`
+- **Returns:** `{ "stable_id": str, "stable_id_version": int, "assembly": str, "sequence": str }` or `list[...]` when `"both"`
 - **API calls:** `GET /api/transcript/?stable_id=...&expand_all=true` (sequence is nested in the transcript response)
 
 ### `get_transcript_exons`
