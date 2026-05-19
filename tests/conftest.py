@@ -2,7 +2,15 @@ import pytest
 import httpx
 import respx
 
+from tark_mcp import client as client_module
+
 BASE_URL = "https://tark.ensembl.org/api/"
+
+
+@pytest.fixture(autouse=True)
+def clear_tark_cache():
+    """Clear the module-level TarkClient cache before each test to prevent cross-test pollution."""
+    client_module._cache.clear()
 
 
 
