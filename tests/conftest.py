@@ -1,54 +1,8 @@
 import pytest
 import httpx
 import respx
-from typing import cast
-from respx.models import ResolvedResponseTypes
 
 BASE_URL = "https://tark.ensembl.org/api/"
-
-# Patch respx to prefer more specific routes (with more conditions) over general ones
-def _patched_resolve(self, request):
-    """Resolve request to a route, preferring more specific patterns."""
-    with self.resolver(request) as resolved:
-        # Sort routes by specificity (number of pattern conditions)
-        routes_by_specificity = sorted(
-            self.routes,
-            key=lambda r: -len(str(r.pattern).split(" AND "))
-        )
-        for route in routes_by_specificity:
-            prospect = route.match(request)
-            if prospect is not None:
-                resolved.route = route
-                resolved.response = cast(ResolvedResponseTypes, prospect)
-                break
-
-    if resolved.response and isinstance(resolved.response.stream, httpx.ByteStream):
-        resolved.response.read()  # Pre-read stream
-
-    return resolved
-
-async def _patched_aresolve(self, request):
-    """Resolve request to a route (async), preferring more specific patterns."""
-    with self.resolver(request) as resolved:
-        # Sort routes by specificity (number of pattern conditions)
-        routes_by_specificity = sorted(
-            self.routes,
-            key=lambda r: -len(str(r.pattern).split(" AND "))
-        )
-        for route in routes_by_specificity:
-            prospect = route.match(request)
-            if prospect is not None:
-                resolved.route = route
-                resolved.response = cast(ResolvedResponseTypes, prospect)
-                break
-
-    if resolved.response and isinstance(resolved.response.stream, httpx.ByteStream):
-        resolved.response.read()  # Pre-read stream
-
-    return resolved
-
-respx.Router.resolve = _patched_resolve
-respx.Router.aresolve = _patched_aresolve
 
 
 

@@ -33,8 +33,9 @@ async def test_get_paginates_automatically(client):
              "results": [{"stable_id": "ENST000001"}]}
     page2 = {"count": 2, "next": None, "previous": BASE + "transcript/",
              "results": [{"stable_id": "ENST000002"}]}
-    respx.get(BASE + "transcript/").mock(return_value=httpx.Response(200, json=page1))
+    # Register specific route first so respx matches it before the general route
     respx.get(BASE + "transcript/?page=2").mock(return_value=httpx.Response(200, json=page2))
+    respx.get(BASE + "transcript/").mock(return_value=httpx.Response(200, json=page1))
 
     results = await client.get("transcript/")
     assert len(results) == 2
@@ -50,8 +51,9 @@ async def test_get_rewrites_http_to_https(client):
              "previous": None, "results": [{"stable_id": "ENST000001"}]}
     page2 = {"count": 2, "next": None, "previous": None,
              "results": [{"stable_id": "ENST000002"}]}
-    respx.get(BASE + "transcript/").mock(return_value=httpx.Response(200, json=page1))
+    # Register specific route first so respx matches it before the general route
     respx.get(BASE + "transcript/?page=2").mock(return_value=httpx.Response(200, json=page2))
+    respx.get(BASE + "transcript/").mock(return_value=httpx.Response(200, json=page1))
 
     results = await client.get("transcript/")
     assert len(results) == 2
