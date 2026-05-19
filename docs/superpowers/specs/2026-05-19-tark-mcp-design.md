@@ -75,6 +75,7 @@ MCP server using the official `mcp` Python SDK (stdio transport). Registers all 
 class Exon(BaseModel):
     stable_id: str
     stable_id_version: int
+    assembly: str             # which genome build this exon belongs to
     order: int                # 1-based exon number
     loc_region: str
     loc_start: int            # 0-based
@@ -139,20 +140,20 @@ class TranscriptDiff(BaseModel):
 
 ## MCP Tools
 
-All tools accept `assembly` defaulting to `"GRCh38"`. Accepted values: `"GRCh37"`, `"GRCh38"`.
+All tools accept `assembly` defaulting to `"GRCh38"`. Accepted values: `"GRCh37"`, `"GRCh38"`, or `"both"`. When `"both"` is specified, the tool fans out requests to both assemblies in parallel and returns combined results, with each record's `assembly` field indicating its origin. For tools that return a single object (e.g., `get_transcript`), specifying `"both"` returns a list with up to two entries (one per assembly).
 
 ### `get_transcript`
 Retrieve a single transcript by stable ID, with full exon structure, CDS boundaries, UTR sequences, associated genes, and protein accession.
 
-- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"`
-- **Returns:** `Transcript` object
+- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
+- **Returns:** `Transcript | list[Transcript]` — single object when one assembly specified, list of up to 2 when `"both"`
 - **API calls:** `GET /api/transcript/?stable_id=...&expand_all=true`
-- **Notes:** Strips version suffix from stable_id if provided (e.g., `ENST00000614536.1` → id=`ENST00000614536`, version=`1`)
+- **Notes:** Strips version suffix from stable_id if provided (e.g., `ENST00000614536.1` → id=`ENST00000614536`, version=`1`). When `assembly="both"`, requests are issued in parallel.
 
 ### `search_transcripts_by_region`
 Find all transcripts whose genomic footprint overlaps a given region.
 
-- **Parameters:** `region: str` (chromosome, e.g. `"1"`, `"chrX"`), `start: int` (0-based), `end: int` (exclusive), `assembly: str = "GRCh38"`
+- **Parameters:** `region: str` (chromosome, e.g. `"1"`, `"chrX"`), `start: int` (0-based), `end: int` (exclusive), `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
 - **Returns:** `list[Transcript]`
 - **API calls:** `GET /api/transcript/?assembly_name=...&loc_region=...&loc_start=...&loc_end=...&expand=transcript_release_set`
 - **Notes:** Converts 0-based input to 1-based for the API. Strips `chr` prefix from region if present.
@@ -160,7 +161,7 @@ Find all transcripts whose genomic footprint overlaps a given region.
 ### `get_gene_transcripts`
 Retrieve all transcripts associated with a gene symbol or Ensembl gene ID.
 
-- **Parameters:** `gene_identifier: str` (e.g. `"BRCA2"` or `"ENSG00000139618"`), `assembly: str = "GRCh38"`
+- **Parameters:** `gene_identifier: str` (e.g. `"BRCA2"` or `"ENSG00000139618"`), `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
 - **Returns:** `list[Transcript]`
 - **API calls:** `GET /api/transcript/search/?identifier_field=...&expand=exons,genes,sequence`
 - **Notes:** The search endpoint does not support server-side assembly filtering; results are filtered client-side by the `assembly` field on each returned transcript.
@@ -168,23 +169,23 @@ Retrieve all transcripts associated with a gene symbol or Ensembl gene ID.
 ### `get_transcript_sequence`
 Fetch the cDNA sequence for a transcript.
 
-- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"`
-- **Returns:** `{ "stable_id": str, "assembly": str, "sequence": str }`
+- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
+- **Returns:** `{ "stable_id": str, "assembly": str, "sequence": str }` or `list[...]` when `"both"`
 - **API calls:** `GET /api/transcript/?stable_id=...&expand_all=true` (sequence is nested in the transcript response)
 
 ### `get_transcript_exons`
 Return the ordered exon list for a transcript with 0-based genomic coordinates.
 
-- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"`
-- **Returns:** `list[Exon]`
+- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
+- **Returns:** `list[Exon]` (combined from both assemblies when `"both"`, each Exon carries its `assembly` field)
 - **API calls:** `GET /api/transcript/?stable_id=...&expand_all=true`
 - **Notes:** Exons are returned in transcript order (reversed for negative-strand transcripts).
 
 ### `get_protein_for_transcript`
 Return the protein (translation) stable ID and version for a transcript.
 
-- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"`
-- **Returns:** `Translation | None`
+- **Parameters:** `stable_id: str`, `assembly: str = "GRCh38"` (`"GRCh37"` | `"GRCh38"` | `"both"`)
+- **Returns:** `Translation | list[Translation] | None`
 - **API calls:** `GET /api/transcript/?stable_id=...&expand_all=true`
 
 ### `diff_transcripts`
@@ -218,7 +219,7 @@ List all available TARK releases with metadata (short name, date, assembly, sour
 | HTTP 404 / empty results | Return empty list or `None`; no exception |
 | HTTP 4xx (other) | Raise `McpError` with descriptive message including the parameters used |
 | HTTP 5xx / network error | Retry up to 3× with exponential backoff; raise `McpError` after exhaustion |
-| Invalid `assembly` value | Immediate `McpError` listing accepted values before any HTTP call |
+| Invalid `assembly` value | Immediate `McpError` listing accepted values (`"GRCh37"`, `"GRCh38"`, `"both"`) before any HTTP call |
 | `stable_ids` list < 2 in `diff_transcripts` | Immediate `McpError`: "At least 2 stable IDs required for diff" |
 
 ---
