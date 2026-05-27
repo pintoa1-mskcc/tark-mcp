@@ -122,6 +122,25 @@ class Transcript(BaseModel):
         else:
             data["latest_release_date"] = None
 
+        # Compute latest_release_version from transcript_release_set array
+        release_set = data.get("transcript_release_set", [])
+        if isinstance(release_set, list) and release_set:
+            versions = [
+                f"{r['source']} v{r['shortname']}"
+                for r in release_set
+                if r.get('source') and r.get('shortname')
+            ]
+            data["latest_release_version"] = ", ".join(versions) if versions else None
+        elif isinstance(release_set, dict):
+            source = release_set.get('source')
+            shortname = release_set.get('shortname')
+            if source and shortname:
+                data["latest_release_version"] = f"{source} v{shortname}"
+            else:
+                data["latest_release_version"] = None
+        else:
+            data["latest_release_version"] = None
+
         return data
 
 
