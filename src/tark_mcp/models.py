@@ -80,6 +80,7 @@ class Transcript(BaseModel):
     translations: list[Translation]
     sequence: str | None
     latest_release_date: str | None = None
+    latest_release_version: str | None = None
 
     @model_validator(mode="before")
     @classmethod
