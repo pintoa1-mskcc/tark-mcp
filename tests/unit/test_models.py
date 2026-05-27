@@ -233,3 +233,120 @@ def test_release_parsed():
     r = Release.model_validate(raw)
     assert r.shortname == "110"
     assert r.assembly == "GRCh38"
+
+
+def test_transcript_latest_release_version_single():
+    """Test extraction of single release version."""
+    data = {
+        "stable_id": "ENST00000380152",
+        "stable_id_version": 7,
+        "assembly": "GRCh38",
+        "loc_start": 100,
+        "loc_end": 200,
+        "loc_region": "13",
+        "loc_strand": 1,
+        "biotype": "protein_coding",
+        "sequence": None,
+        "genes": [],
+        "exons": [],
+        "translations": [],
+        "transcript_release_set": [
+            {"source": "Ensembl", "shortname": "110", "release_date": "2023-04-01"}
+        ],
+    }
+    t = Transcript.model_validate(data)
+    assert t.latest_release_version == "Ensembl v110"
+
+
+def test_transcript_latest_release_version_multiple():
+    """Test concatenation of multiple release versions."""
+    data = {
+        "stable_id": "ENST00000380152",
+        "stable_id_version": 7,
+        "assembly": "GRCh38",
+        "loc_start": 100,
+        "loc_end": 200,
+        "loc_region": "13",
+        "loc_strand": 1,
+        "biotype": "protein_coding",
+        "sequence": None,
+        "genes": [],
+        "exons": [],
+        "translations": [],
+        "transcript_release_set": [
+            {"source": "Ensembl", "shortname": "109", "release_date": "2022-12-01"},
+            {"source": "Ensembl", "shortname": "110", "release_date": "2023-04-01"}
+        ],
+    }
+    t = Transcript.model_validate(data)
+    assert t.latest_release_version == "Ensembl v109, Ensembl v110"
+
+
+def test_transcript_latest_release_version_empty():
+    """Test handling of empty release set."""
+    data = {
+        "stable_id": "ENST00000380152",
+        "stable_id_version": 7,
+        "assembly": "GRCh38",
+        "loc_start": 100,
+        "loc_end": 200,
+        "loc_region": "13",
+        "loc_strand": 1,
+        "biotype": "protein_coding",
+        "sequence": None,
+        "genes": [],
+        "exons": [],
+        "translations": [],
+        "transcript_release_set": [],
+    }
+    t = Transcript.model_validate(data)
+    assert t.latest_release_version is None
+
+
+def test_transcript_latest_release_version_dict():
+    """Test handling of dict instead of list."""
+    data = {
+        "stable_id": "ENST00000380152",
+        "stable_id_version": 7,
+        "assembly": "GRCh38",
+        "loc_start": 100,
+        "loc_end": 200,
+        "loc_region": "13",
+        "loc_strand": 1,
+        "biotype": "protein_coding",
+        "sequence": None,
+        "genes": [],
+        "exons": [],
+        "translations": [],
+        "transcript_release_set": {
+            "source": "Ensembl",
+            "shortname": "110",
+            "release_date": "2023-04-01"
+        },
+    }
+    t = Transcript.model_validate(data)
+    assert t.latest_release_version == "Ensembl v110"
+
+
+def test_transcript_latest_release_version_missing_fields():
+    """Test handling of releases with missing source or shortname."""
+    data = {
+        "stable_id": "ENST00000380152",
+        "stable_id_version": 7,
+        "assembly": "GRCh38",
+        "loc_start": 100,
+        "loc_end": 200,
+        "loc_region": "13",
+        "loc_strand": 1,
+        "biotype": "protein_coding",
+        "sequence": None,
+        "genes": [],
+        "exons": [],
+        "translations": [],
+        "transcript_release_set": [
+            {"shortname": "110"},  # missing source
+            {"source": "Ensembl"},  # missing shortname
+        ],
+    }
+    t = Transcript.model_validate(data)
+    assert t.latest_release_version is None
