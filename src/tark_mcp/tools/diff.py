@@ -112,6 +112,47 @@ async def _build_diff(
     )
 
 
+async def _resolve_transcript(
+    stable_id: str,
+    assembly: str,
+    client: TarkClient,
+) -> Transcript:
+    """Fetch a single Transcript by stable ID, handling version suffixes and RefSeq IDs."""
+    sid, version = stable_id, None
+    if "." in stable_id:
+        parts = stable_id.rsplit(".", 1)
+        try:
+            version = int(parts[1])
+            sid = parts[0]
+        except ValueError:
+            pass
+
+    params: dict = {"stable_id": sid, "expand_all": "true", "assembly_name": assembly}
+    if version is not None:
+        params["stable_id_version"] = version
+
+    data = await client.get("transcript/", params=params)
+    if not data:
+        raise ValueError(
+            f"Transcript not found: {stable_id} (assembly={assembly})"
+        )
+
+    transcripts = [Transcript.model_validate(r) for r in data]
+
+    if version is not None:
+        matching = [t for t in transcripts if t.stable_id_version == version]
+        if matching:
+            return matching[0]
+        raise ValueError(
+            f"Transcript not found: {stable_id} (assembly={assembly})"
+        )
+
+    return max(
+        transcripts,
+        key=lambda t: (t.latest_release_date or "", t.stable_id_version),
+    )
+
+
 async def _fetch_diff_pair(
     ref_stable_id: str,
     candidate_stable_id: str,
@@ -119,23 +160,10 @@ async def _fetch_diff_pair(
     candidate_assembly: str,
     client: TarkClient,
 ) -> TranscriptDiff:
-    raw = await client.get_raw(
-        "transcript/diff/",
-        params={
-            "diff_me_stable_id": ref_stable_id,
-            "diff_with_stable_id": candidate_stable_id,
-        },
+    ref, candidate = await asyncio.gather(
+        _resolve_transcript(ref_stable_id, ref_assembly, client),
+        _resolve_transcript(candidate_stable_id, candidate_assembly, client),
     )
-    ref_data = raw.get("diff_me_transcript", {})
-    cand_data = raw.get("diff_with_transcript", {})
-
-    if not isinstance(ref_data.get("assembly"), dict):
-        ref_data = {**ref_data, "assembly": {"assembly_name": ref_assembly}}
-    if not isinstance(cand_data.get("assembly"), dict):
-        cand_data = {**cand_data, "assembly": {"assembly_name": candidate_assembly}}
-
-    ref = Transcript.model_validate(ref_data)
-    candidate = Transcript.model_validate(cand_data)
     return await _build_diff(ref, candidate, client)
 
 

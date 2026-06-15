@@ -134,7 +134,9 @@ async def tark_diff_transcripts(
     None for sequence comparison fields.
 
     Args:
-        stable_ids: List of ≥2 Ensembl transcript stable IDs; first is the reference
+        stable_ids: List of ≥2 transcript stable IDs (Ensembl or RefSeq); first is the
+            reference. Version suffixes are supported (e.g. 'ENST00000380152.7',
+            'NM_001128425.2').
         assemblies: Optional per-entry assembly override list; defaults to 'GRCh38' for missing entries
     """
     results = await diff_transcripts(stable_ids, assemblies=assemblies, client=_client)
