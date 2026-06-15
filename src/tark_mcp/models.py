@@ -75,6 +75,8 @@ class Transcript(BaseModel):
     loc_strand: int
     cds_start: int | None
     cds_end: int | None
+    five_prime_utr_length: int | None = None
+    three_prime_utr_length: int | None = None
     exons: list[Exon]
     genes: list[Gene]
     translations: list[Translation]
@@ -108,6 +110,8 @@ class Transcript(BaseModel):
         if five_utr is not None and transcript_seq is not None:
             data["cds_start"] = len(five_utr)
             data["cds_end"] = len(transcript_seq) - (len(three_utr) if three_utr else 0)
+            data["five_prime_utr_length"] = len(five_utr)
+            data["three_prime_utr_length"] = len(three_utr) if three_utr else 0
         else:
             data.setdefault("cds_start", None)
             data.setdefault("cds_end", None)
