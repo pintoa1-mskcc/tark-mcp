@@ -157,7 +157,7 @@ For the actual amino acid sequence, use `tark_diff_transcripts` (it fetches prot
 ## Common Pitfalls
 
 - **`tark_get_mane_transcripts` is slow for bulk use.** It fetches all MANE entries then filters client-side. Fine for a single gene; avoid calling it in a loop across many genes — use `tark_get_gene_transcripts` per gene instead.
-- **Strip `chr` prefix for region searches.** `tark_search_transcripts_by_region` requires a numeric/plain chromosome string. `"chr13"` will return no results; use `"13"`.
+- **`chr` prefix is stripped automatically.** `tark_search_transcripts_by_region` accepts both `"chr13"` and `"13"` — the prefix is stripped internally before querying the API.
 - **`tark_diff_transcripts` passes IDs directly to the TARK `/diff/` endpoint without stripping versions.** If results are unexpected, try passing base stable IDs (without `.version` suffix).
 - **Non-coding transcripts return `None` for CDS/protein fields in diffs.** Always check `reference_protein_coding` and `candidate_protein_coding` before interpreting `cds_sequence_changed` or `protein_sequence_changed`.
 - **`assembly="both"` returns a flat list.** Check the `assembly` field on each record to identify which build it came from.
