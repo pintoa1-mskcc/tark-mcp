@@ -208,13 +208,12 @@ async def test_diff_transcripts_multiple_pairs():
     second_candidate_page = _page([second_candidate_raw])
 
     client = TarkClient()
-    # pair1: ref=BRCA2, cand1=NONCODING; pair2: ref=BRCA2, cand2=SECOND
-    # asyncio.gather runs both pairs concurrently → 4 /transcript/ calls
+    # pair1: ref=BRCA2, cand1=NONCODING; pair2: ref=BRCA2 (cached), cand2=SECOND
+    # pair2-ref hits the TarkClient in-memory cache populated by pair1-ref → 3 HTTP calls total
     respx.get(BASE + "transcript/").mock(side_effect=[
-        httpx.Response(200, json=TRANSCRIPT_BRCA2_PAGE),
-        httpx.Response(200, json=TRANSCRIPT_NONCODING_PAGE),
-        httpx.Response(200, json=TRANSCRIPT_BRCA2_PAGE),
-        httpx.Response(200, json=second_candidate_page),
+        httpx.Response(200, json=TRANSCRIPT_BRCA2_PAGE),    # pair1-ref
+        httpx.Response(200, json=TRANSCRIPT_NONCODING_PAGE), # pair1-cand
+        httpx.Response(200, json=second_candidate_page),     # pair2-cand (pair2-ref is cached)
     ])
     respx.get(BASE + "translation/").mock(
         return_value=httpx.Response(200, json=TRANSLATION_REF_RESPONSE)
@@ -223,6 +222,8 @@ async def test_diff_transcripts_multiple_pairs():
         ["ENST00000380152", "ENST00000614536", "ENST00000999999"], client=client
     )
     assert len(results) == 2
+    assert results[0].candidate_stable_id == "ENST00000614536"
+    assert results[1].candidate_stable_id == "ENST00000999999"
 
 
 @respx.mock
