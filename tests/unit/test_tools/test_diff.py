@@ -208,12 +208,11 @@ async def test_diff_transcripts_multiple_pairs():
     second_candidate_page = _page([second_candidate_raw])
 
     client = TarkClient()
-    # pair1: ref=BRCA2, cand1=NONCODING; pair2: ref=BRCA2 (cached), cand2=SECOND
-    # pair2-ref hits the TarkClient in-memory cache populated by pair1-ref → 3 HTTP calls total
+    # ref is resolved once before the gather; candidates fetched concurrently: 3 HTTP calls total
     respx.get(BASE + "transcript/").mock(side_effect=[
-        httpx.Response(200, json=TRANSCRIPT_BRCA2_PAGE),    # pair1-ref
-        httpx.Response(200, json=TRANSCRIPT_NONCODING_PAGE), # pair1-cand
-        httpx.Response(200, json=second_candidate_page),     # pair2-cand (pair2-ref is cached)
+        httpx.Response(200, json=TRANSCRIPT_BRCA2_PAGE),     # ref (resolved once)
+        httpx.Response(200, json=TRANSCRIPT_NONCODING_PAGE), # cand1
+        httpx.Response(200, json=second_candidate_page),     # cand2
     ])
     respx.get(BASE + "translation/").mock(
         return_value=httpx.Response(200, json=TRANSLATION_REF_RESPONSE)

@@ -154,16 +154,12 @@ async def _resolve_transcript(
 
 
 async def _fetch_diff_pair(
-    ref_stable_id: str,
+    ref: Transcript,
     candidate_stable_id: str,
-    ref_assembly: str,
     candidate_assembly: str,
     client: TarkClient,
 ) -> TranscriptDiff:
-    ref, candidate = await asyncio.gather(
-        _resolve_transcript(ref_stable_id, ref_assembly, client),
-        _resolve_transcript(candidate_stable_id, candidate_assembly, client),
-    )
+    candidate = await _resolve_transcript(candidate_stable_id, candidate_assembly, client)
     return await _build_diff(ref, candidate, client)
 
 
@@ -184,13 +180,12 @@ async def diff_transcripts(
     ref_id = stable_ids[0]
     ref_assembly = resolved_assemblies[0]
 
-    pairs = [
-        (ref_id, stable_ids[i], ref_assembly, resolved_assemblies[i])
-        for i in range(1, len(stable_ids))
-    ]
+    # Resolve the reference transcript once so all candidate pairs share it
+    # without duplicate fetches (concurrent pairs would otherwise race on the cache).
+    ref_transcript = await _resolve_transcript(ref_id, ref_assembly, client)
 
     results = await asyncio.gather(*[
-        _fetch_diff_pair(ref, cand, ra, ca, client)
-        for ref, cand, ra, ca in pairs
+        _fetch_diff_pair(ref_transcript, stable_ids[i], resolved_assemblies[i], client)
+        for i in range(1, len(stable_ids))
     ])
     return list(results)
