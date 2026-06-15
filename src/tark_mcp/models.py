@@ -5,8 +5,8 @@ from pydantic import BaseModel, model_validator
 class Exon(BaseModel):
     stable_id: str
     stable_id_version: int
-    transcript_stable_id: str
-    transcript_stable_id_version: int
+    transcript_stable_id: str | None = None
+    transcript_stable_id_version: int | None = None
     assembly: str
     order: int
     loc_region: str
@@ -47,8 +47,8 @@ class Gene(BaseModel):
 class Translation(BaseModel):
     stable_id: str
     stable_id_version: int
-    transcript_stable_id: str
-    transcript_stable_id_version: int
+    transcript_stable_id: str | None = None
+    transcript_stable_id_version: int | None = None
     assembly: str
     sequence: str | None = None
 
