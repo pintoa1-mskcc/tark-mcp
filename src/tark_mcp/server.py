@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from mcp.server.fastmcp import FastMCP
 
 from tark_mcp.client import TarkClient
@@ -10,6 +11,7 @@ from tark_mcp.tools.sequences import (
 )
 from tark_mcp.tools.mane import get_mane_transcripts
 from tark_mcp.tools.diff import diff_transcripts
+from tark_mcp.tools.formatters import format_transcripts_table
 
 mcp = FastMCP("tark")
 _client = TarkClient()
@@ -36,6 +38,61 @@ async def tark_get_transcript(stable_id: str, assembly: str = "GRCh38") -> dict 
     if isinstance(result, list):
         return [t.model_dump() for t in result]
     return result.model_dump()
+
+
+@mcp.tool()
+async def tark_get_transcripts(
+    stable_ids: list[str],
+    assemblies: list[str] | None = None,
+) -> str:
+    """Retrieve multiple transcripts in a single call and return a formatted summary table.
+
+    Columns: Query, Assembly, Stable ID, Ver, Exons, 5'UTR, 3'UTR, CDS (bp),
+             AA Len, First Release, Latest Release, Release Date, MANE.
+
+    Args:
+        stable_ids: List of transcript stable IDs (Ensembl or RefSeq). Version suffixes supported,
+            e.g. ['ENST00000380152.7', 'NM_001128425.2']
+        assemblies: Optional per-entry assembly override list ('GRCh37' or 'GRCh38').
+            Defaults to 'GRCh38' for any missing entries.
+    """
+    resolved = list(assemblies or [])
+    while len(resolved) < len(stable_ids):
+        resolved.append("GRCh38")
+
+    transcript_results, mane_raw = await asyncio.gather(
+        asyncio.gather(*[
+            get_transcript(sid, assembly=asm, client=_client)
+            for sid, asm in zip(stable_ids, resolved)
+        ]),
+        _client.get("transcript/manelist/"),
+    )
+
+    # Build lookup: stable_id (no version) → normalised MANE type label
+    mane_lookup: dict[str, str] = {}
+    for entry in mane_raw:
+        raw_type = (entry.get("mane_type") or "").upper()
+        if "PLUS CLINICAL" in raw_type:
+            label = "MANE Plus Clinical"
+        elif "SELECT" in raw_type:
+            label = "MANE Select"
+        else:
+            label = raw_type
+        for key in ("ens_stable_id", "refseq_stable_id"):
+            sid = entry.get(key)
+            if sid:
+                mane_lookup[sid] = label
+
+    dicts: list[dict | list[dict] | None] = []
+    for result in transcript_results:
+        if result is None:
+            dicts.append(None)
+        elif isinstance(result, list):
+            dicts.append([t.model_dump() for t in result])
+        else:
+            dicts.append(result.model_dump())
+
+    return format_transcripts_table(stable_ids, resolved, dicts, mane_lookup=mane_lookup)
 
 
 @mcp.tool()

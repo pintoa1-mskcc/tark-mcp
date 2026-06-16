@@ -34,6 +34,11 @@ TRANSCRIPT_BRCA2_RAW = {
     "three_prime_utr_end": 32400266,
     "five_prime_utr_start": 32315475,
     "five_prime_utr_end": 32316460,
+    "cds_info": {
+        "five_prime_utr_length": 4,
+        "three_prime_utr_length": 2,
+        "cds_seq": "ATCGATCGATCGATCGATCGATCG",
+    },
     "transcript_release_set": [
         {"assembly": "GRCh38", "shortname": "110", "description": "Ensembl release",
          "release_date": "2023-04-01", "source": "Ensembl"},

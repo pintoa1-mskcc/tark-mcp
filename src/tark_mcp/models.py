@@ -77,6 +77,7 @@ class Transcript(BaseModel):
     cds_end: int | None
     five_prime_utr_length: int | None = None
     three_prime_utr_length: int | None = None
+    cds_seq: str | None = None
     exons: list[Exon]
     genes: list[Gene]
     translations: list[Translation]
@@ -115,6 +116,15 @@ class Transcript(BaseModel):
         else:
             data.setdefault("cds_start", None)
             data.setdefault("cds_end", None)
+
+        # Pull cds_seq and UTR lengths directly from TARK's cds_info when available
+        cds_info = data.get("cds_info")
+        if isinstance(cds_info, dict):
+            data["cds_seq"] = cds_info.get("cds_seq")
+            if cds_info.get("five_prime_utr_length") is not None:
+                data["five_prime_utr_length"] = cds_info["five_prime_utr_length"]
+            if cds_info.get("three_prime_utr_length") is not None:
+                data["three_prime_utr_length"] = cds_info["three_prime_utr_length"]
 
         # Compute latest_release_date from transcript_release_set array
         release_set = data.get("transcript_release_set", [])
