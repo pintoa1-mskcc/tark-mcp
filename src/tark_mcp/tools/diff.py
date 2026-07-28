@@ -1,7 +1,8 @@
 from __future__ import annotations
 import asyncio
 from tark_mcp.client import TarkClient
-from tark_mcp.models import Transcript, ExonDiff, TranscriptDiff
+from tark_mcp.models import AminoAcidDiff, ExonDiff, Transcript, TranscriptDiff
+from tark_mcp.tools.alignment import needleman_wunsch
 
 
 def _compute_exon_diffs(ref_exons: list, candidate_exons: list) -> list[ExonDiff]:
@@ -31,6 +32,38 @@ def _compute_exon_diffs(ref_exons: list, candidate_exons: list) -> list[ExonDiff
             cand_coords = (cand.loc_start, cand.loc_end)
         diffs.append(ExonDiff(order=order, change=change,
                                ref_coords=ref_coords, candidate_coords=cand_coords))
+    return diffs
+
+
+def _compute_protein_diffs(ref_seq: str, cand_seq: str) -> list[AminoAcidDiff]:
+    """Align two protein sequences with Needleman-Wunsch and return one
+    AminoAcidDiff per differing column, with correctly counted 1-based
+    positions on each side. Identical columns are omitted."""
+    aligned_ref, aligned_cand = needleman_wunsch(ref_seq, cand_seq)
+
+    ref_pos = 0
+    cand_pos = 0
+    diffs: list[AminoAcidDiff] = []
+    for r, c in zip(aligned_ref, aligned_cand):
+        if r != "-":
+            ref_pos += 1
+        if c != "-":
+            cand_pos += 1
+        if r == c:
+            continue
+        if r == "-":
+            change = "insertion"
+        elif c == "-":
+            change = "deletion"
+        else:
+            change = "substitution"
+        diffs.append(AminoAcidDiff(
+            ref_position=ref_pos if r != "-" else None,
+            candidate_position=cand_pos if c != "-" else None,
+            change=change,
+            ref_residue=None if r == "-" else r,
+            candidate_residue=None if c == "-" else c,
+        ))
     return diffs
 
 
