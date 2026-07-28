@@ -173,6 +173,14 @@ class ExonDiff(BaseModel):
     candidate_coords: tuple[int, int] | None
 
 
+class AminoAcidDiff(BaseModel):
+    ref_position: int | None        # 1-based; None for insertion columns
+    candidate_position: int | None  # 1-based; None for deletion columns
+    change: str  # "substitution", "insertion", "deletion"
+    ref_residue: str | None
+    candidate_residue: str | None
+
+
 class TranscriptDiff(BaseModel):
     reference_stable_id: str
     candidate_stable_id: str
@@ -191,3 +199,4 @@ class TranscriptDiff(BaseModel):
     protein_sequence_changed: bool | None
     ref_protein_sequence: str | None
     candidate_protein_sequence: str | None
+    protein_diffs: list[AminoAcidDiff] | None
