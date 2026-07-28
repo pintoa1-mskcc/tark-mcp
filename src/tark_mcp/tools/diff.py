@@ -122,6 +122,10 @@ async def _build_diff(
     if ref_protein_seq is not None and cand_protein_seq is not None:
         protein_changed = ref_protein_seq != cand_protein_seq
 
+    protein_diffs: list[AminoAcidDiff] | None = None
+    if ref_protein_seq is not None and cand_protein_seq is not None:
+        protein_diffs = _compute_protein_diffs(ref_protein_seq, cand_protein_seq)
+
     exon_diffs = _compute_exon_diffs(ref.exons, candidate.exons)
 
     return TranscriptDiff(
@@ -142,6 +146,7 @@ async def _build_diff(
         protein_sequence_changed=protein_changed,
         ref_protein_sequence=ref_protein_seq,
         candidate_protein_sequence=cand_protein_seq,
+        protein_diffs=protein_diffs,
     )
 
 

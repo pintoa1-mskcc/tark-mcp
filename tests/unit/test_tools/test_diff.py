@@ -213,6 +213,20 @@ async def test_diff_transcripts_coding_pair_populates_all_sequence_fields():
     assert diff.candidate_protein_sequence == "MVLSPAD"
     assert diff.protein_sequence_changed is True
 
+    # ref="MPIGSKERP" (9aa), candidate="MVLSPAD" (7aa) aligned via NW
+    # (match=2, mismatch=-1, gap=-2) gives: "MPIGSKERP" / "M-VLS-PAD"
+    assert [d.change for d in diff.protein_diffs] == [
+        "deletion", "substitution", "substitution",
+        "deletion", "substitution", "substitution", "substitution",
+    ]
+    assert diff.protein_diffs[0].ref_position == 2
+    assert diff.protein_diffs[0].candidate_position is None
+    assert diff.protein_diffs[0].ref_residue == "P"
+    assert diff.protein_diffs[1].ref_position == 3
+    assert diff.protein_diffs[1].candidate_position == 2
+    assert diff.protein_diffs[1].ref_residue == "I"
+    assert diff.protein_diffs[1].candidate_residue == "V"
+
 
 @respx.mock
 @pytest.mark.asyncio
@@ -235,6 +249,7 @@ async def test_diff_transcripts_noncoding_ref_sets_none_sentinels():
     assert diff.candidate_cds_sequence is None
     assert diff.ref_protein_sequence is None
     assert diff.candidate_protein_sequence is None
+    assert diff.protein_diffs is None
 
 
 @respx.mock
@@ -257,6 +272,7 @@ async def test_diff_transcripts_mixed_pair_sets_none_sentinels():
     assert diff.candidate_protein_coding is False
     assert diff.cds_sequence_changed is None
     assert diff.protein_sequence_changed is None
+    assert diff.protein_diffs is None
 
 
 @respx.mock
