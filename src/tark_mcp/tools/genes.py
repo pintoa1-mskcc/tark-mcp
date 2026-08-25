@@ -13,7 +13,7 @@ async def get_gene_transcripts(
         client = TarkClient()
     params = {
         "identifier_field": gene_identifier,
-        "expand": "exons,genes,sequence",
+        "expand_all": "true",
     }
     data = await client.get("transcript/search/", params)
     transcripts = [Transcript.model_validate(r) for r in data]
