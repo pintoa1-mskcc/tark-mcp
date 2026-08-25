@@ -3,7 +3,7 @@ import httpx
 import respx
 
 from tark_mcp.client import TarkClient
-from tark_mcp.tools.diff import _resolve_transcript, diff_transcripts
+from tark_mcp.tools.diff import _compute_protein_diffs, _resolve_transcript, diff_transcripts
 from tests.conftest import (
     TRANSCRIPT_BRCA2_RAW, TRANSCRIPT_NONCODING_RAW,
     TRANSLATION_BRCA2_RAW,
@@ -58,6 +58,97 @@ TRANSCRIPT_CODING_CANDIDATE_RAW = {
     ],
 }
 TRANSCRIPT_CODING_CANDIDATE_PAGE = _page([TRANSCRIPT_CODING_CANDIDATE_RAW])
+
+
+def test_compute_protein_diffs_reports_substitution_with_aligned_positions():
+    """A single substitution between equal-length sequences is reported at the
+    same 1-based position on both sides."""
+    diffs = _compute_protein_diffs("MAT", "MST")
+    assert len(diffs) == 1
+    d = diffs[0]
+    assert d.change == "substitution"
+    assert d.ref_position == 2
+    assert d.candidate_position == 2
+    assert d.ref_residue == "A"
+    assert d.candidate_residue == "S"
+
+
+def test_compute_protein_diffs_reports_deletion_with_none_candidate_position():
+    """A residue present only in the reference is a deletion; candidate_position
+    is None since there's no corresponding aligned residue on that side."""
+    diffs = _compute_protein_diffs("ABC", "AC")
+    assert len(diffs) == 1
+    d = diffs[0]
+    assert d.change == "deletion"
+    assert d.ref_position == 2
+    assert d.candidate_position is None
+    assert d.ref_residue == "B"
+    assert d.candidate_residue is None
+
+
+def test_compute_protein_diffs_reports_insertion_with_none_ref_position():
+    """A residue present only in the candidate is an insertion; ref_position is
+    None since there's no corresponding aligned residue on that side."""
+    diffs = _compute_protein_diffs("AC", "ABC")
+    assert len(diffs) == 1
+    d = diffs[0]
+    assert d.change == "insertion"
+    assert d.ref_position is None
+    assert d.candidate_position == 2
+    assert d.ref_residue is None
+    assert d.candidate_residue == "B"
+
+
+def test_compute_protein_diffs_identical_sequences_returns_empty_list():
+    assert _compute_protein_diffs("MATS", "MATS") == []
+
+
+def test_compute_protein_diffs_real_world_regression_r234s_p313s():
+    """Regression test: NM_005027.3 vs ENST00000222254.8 (GRCh37) protein
+    sequences, validated manually against the live TARK API. Expect exactly
+    two substitutions: R234S and P313S, with no indels."""
+    ref_seq = (
+        "MAGPEGFQYRALYPFRRERPEDLELLPGDVLVVSRAALQALGVAEGGERCPQSVGWMPGLNERTRQRGDF"
+        "PGTYVEFLGPVALARPGPRPRGPRPLPARPRDGAPEPGLTLPDLPEQFSPPDVAPPLLVKLVEAIERTGL"
+        "DSESHYRPELPAPRTDWSLSDVDQWDTAALADGIKSFLLALPAPLVTPEASAEARRALREAAGPVGPALE"
+        "PPTLPLHRALTLRFLLQHLGRVARRAPALGPAVRALGATFGPLLLRAPPPPSSPPPGGAPDGSEPSPDFP"
+        "ALLVEKLLQEHLEEQEVAPPALPPKPPKAKPAPTVLANGGSPPSLQDAEWYWGDISREEVNEKLRDTPDG"
+        "TFLVRDASSKIQGEYTLTLRKGGNNKLIKVFHRDGHYGFSEPLTFCSVVDLINHYRHESLAQYNAKLDTR"
+        "LLYPVSKYQQDQIVKEDSVEAVGAQLKVYHQQYQDKSREYDQLYEEYTRTSQELQMKRTAIEAFNETIKI"
+        "FEEQGQTQEKCSKEYLERFRREGNEKEMQRILLNSERLKSRIAEIHESRTKLEQQLRAQASDNREIDKRM"
+        "NSLKPDLMQLRKIRDQYLVWLTQKGARQKKINEWLGIKNETEDQYALMEDEDDLPHHEERTWYVGKINR"
+        "TQAEEMLSGKRDGTFLIRESSQRGCYACSVVVDGDTKHCVIYRTATGFGFAEPYNLYGSLKELVLHYQHA"
+        "SLVQHNDALTVTLAHPVRAPGPGPPPAAR"
+    )
+    cand_seq = (
+        "MAGPEGFQYRALYPFRRERPEDLELLPGDVLVVSRAALQALGVAEGGERCPQSVGWMPGLNERTRQRGDF"
+        "PGTYVEFLGPVALARPGPRPRGPRPLPARPRDGAPEPGLTLPDLPEQFSPPDVAPPLLVKLVEAIERTGL"
+        "DSESHYRPELPAPRTDWSLSDVDQWDTAALADGIKSFLLALPAPLVTPEASAEARRALREAAGPVGPALE"
+        "PPTLPLHRALTLRFLLQHLGRVASRAPALGPAVRALGATFGPLLLRAPPPPSSPPPGGAPDGSEPSPDFP"
+        "ALLVEKLLQEHLEEQEVAPPALPPKPPKAKPASTVLANGGSPPSLQDAEWYWGDISREEVNEKLRDTPDG"
+        "TFLVRDASSKIQGEYTLTLRKGGNNKLIKVFHRDGHYGFSEPLTFCSVVDLINHYRHESLAQYNAKLDTR"
+        "LLYPVSKYQQDQIVKEDSVEAVGAQLKVYHQQYQDKSREYDQLYEEYTRTSQELQMKRTAIEAFNETIKI"
+        "FEEQGQTQEKCSKEYLERFRREGNEKEMQRILLNSERLKSRIAEIHESRTKLEQQLRAQASDNREIDKRM"
+        "NSLKPDLMQLRKIRDQYLVWLTQKGARQKKINEWLGIKNETEDQYALMEDEDDLPHHEERTWYVGKINR"
+        "TQAEEMLSGKRDGTFLIRESSQRGCYACSVVVDGDTKHCVIYRTATGFGFAEPYNLYGSLKELVLHYQHA"
+        "SLVQHNDALTVTLAHPVRAPGPGPPPAAR"
+    )
+    diffs = _compute_protein_diffs(ref_seq, cand_seq)
+    assert len(diffs) == 2
+
+    r234s = diffs[0]
+    assert r234s.change == "substitution"
+    assert r234s.ref_position == 234
+    assert r234s.candidate_position == 234
+    assert r234s.ref_residue == "R"
+    assert r234s.candidate_residue == "S"
+
+    p313s = diffs[1]
+    assert p313s.change == "substitution"
+    assert p313s.ref_position == 313
+    assert p313s.candidate_position == 313
+    assert p313s.ref_residue == "P"
+    assert p313s.candidate_residue == "S"
 
 
 @respx.mock
@@ -122,6 +213,20 @@ async def test_diff_transcripts_coding_pair_populates_all_sequence_fields():
     assert diff.candidate_protein_sequence == "MVLSPAD"
     assert diff.protein_sequence_changed is True
 
+    # ref="MPIGSKERP" (9aa), candidate="MVLSPAD" (7aa) aligned via NW
+    # (match=2, mismatch=-1, gap=-2) gives: "MPIGSKERP" / "M-VLS-PAD"
+    assert [d.change for d in diff.protein_diffs] == [
+        "deletion", "substitution", "substitution",
+        "deletion", "substitution", "substitution", "substitution",
+    ]
+    assert diff.protein_diffs[0].ref_position == 2
+    assert diff.protein_diffs[0].candidate_position is None
+    assert diff.protein_diffs[0].ref_residue == "P"
+    assert diff.protein_diffs[1].ref_position == 3
+    assert diff.protein_diffs[1].candidate_position == 2
+    assert diff.protein_diffs[1].ref_residue == "I"
+    assert diff.protein_diffs[1].candidate_residue == "V"
+
 
 @respx.mock
 @pytest.mark.asyncio
@@ -144,6 +249,7 @@ async def test_diff_transcripts_noncoding_ref_sets_none_sentinels():
     assert diff.candidate_cds_sequence is None
     assert diff.ref_protein_sequence is None
     assert diff.candidate_protein_sequence is None
+    assert diff.protein_diffs is None
 
 
 @respx.mock
@@ -166,6 +272,7 @@ async def test_diff_transcripts_mixed_pair_sets_none_sentinels():
     assert diff.candidate_protein_coding is False
     assert diff.cds_sequence_changed is None
     assert diff.protein_sequence_changed is None
+    assert diff.protein_diffs is None
 
 
 @respx.mock
