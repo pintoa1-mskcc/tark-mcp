@@ -53,17 +53,30 @@ async def tark_get_transcripts(
     Args:
         stable_ids: List of transcript stable IDs (Ensembl or RefSeq). Version suffixes supported,
             e.g. ['ENST00000380152.7', 'NM_001128425.2']
-        assemblies: Optional per-entry assembly override list ('GRCh37' or 'GRCh38').
+        assemblies: Optional per-entry assembly override list ('GRCh37', 'GRCh38', or 'both').
+            'both' expands the entry into two rows (GRCh38 + GRCh37).
             Defaults to 'GRCh38' for any missing entries.
     """
     resolved = list(assemblies or [])
     while len(resolved) < len(stable_ids):
         resolved.append("GRCh38")
 
+    # Expand "both" entries into separate GRCh38 + GRCh37 fetches, keeping
+    # the original query label for each expanded row.
+    expanded_queries: list[str] = []
+    expanded_assemblies: list[str] = []
+    for sid, asm in zip(stable_ids, resolved):
+        if asm == "both":
+            expanded_queries.extend([sid, sid])
+            expanded_assemblies.extend(["GRCh38", "GRCh37"])
+        else:
+            expanded_queries.append(sid)
+            expanded_assemblies.append(asm)
+
     transcript_results, mane_raw = await asyncio.gather(
         asyncio.gather(*[
             get_transcript(sid, assembly=asm, client=_client)
-            for sid, asm in zip(stable_ids, resolved)
+            for sid, asm in zip(expanded_queries, expanded_assemblies)
         ]),
         _client.get("transcript/manelist/"),
     )
@@ -92,7 +105,7 @@ async def tark_get_transcripts(
         else:
             dicts.append(result.model_dump())
 
-    return format_transcripts_table(stable_ids, resolved, dicts, mane_lookup=mane_lookup)
+    return format_transcripts_table(expanded_queries, expanded_assemblies, dicts, mane_lookup=mane_lookup)
 
 
 @mcp.tool()
