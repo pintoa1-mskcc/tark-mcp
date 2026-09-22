@@ -102,9 +102,10 @@ async def test_get_mane_transcripts(client):
 async def test_get_mane_transcripts_filtered(client):
     results = await get_mane_transcripts(gene_identifier="BRCA2", client=client)
     assert len(results) > 0
-    for t in results:
-        gene_names = {g.name for g in t.genes}
-        assert "BRCA2" in gene_names
+    for m in results:
+        assert m.gene_name == "BRCA2"
+        assert m.ensembl_id.startswith("ENST")
+        assert m.refseq_id.startswith("NM_")
 
 
 @pytest.mark.asyncio

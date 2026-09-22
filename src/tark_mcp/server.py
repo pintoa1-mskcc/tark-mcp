@@ -203,10 +203,14 @@ async def tark_get_protein_for_transcript(
 
 @mcp.tool()
 async def tark_get_mane_transcripts(gene_identifier: str | None = None) -> list[dict]:
-    """Return MANE Select and MANE Plus Clinical transcripts, optionally filtered by gene.
+    """Return MANE Select and MANE Plus Clinical Ensembl <-> RefSeq pairings, optionally filtered by gene.
+
+    Each entry is IDs only: ensembl_id and refseq_id (both versioned), mane_type, gene_name.
+    Use tark_get_transcript on ensembl_id/refseq_id for coordinates, exons and sequence.
 
     Args:
-        gene_identifier: Optional gene symbol or Ensembl gene ID to filter results
+        gene_identifier: Optional gene symbol (e.g. "TP53", case-insensitive) to filter results.
+            Ensembl gene IDs are not supported — the MANE endpoint carries symbols only.
     """
     results = await get_mane_transcripts(gene_identifier=gene_identifier, client=_client)
     return [t.model_dump() for t in results]

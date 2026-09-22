@@ -18,7 +18,7 @@ Use this skill when a user asks about Ensembl transcripts, genes, MANE transcrip
 | `tark_get_transcript_sequence` | cDNA sequence for a transcript |
 | `tark_get_transcript_exons` | Ordered exon list with 0-based genomic coordinates |
 | `tark_get_protein_for_transcript` | Protein/translation stable ID and version for a transcript |
-| `tark_get_mane_transcripts` | MANE Select and MANE Plus Clinical transcripts, optionally filtered by gene |
+| `tark_get_mane_transcripts` | MANE Select and MANE Plus Clinical transcripts, optionally filtered by gene symbol (IDs only) |
 | `tark_diff_transcripts` | Structural + CDS + protein diff; first ID is the reference |
 
 ---
@@ -43,7 +43,7 @@ Use this skill when a user asks about Ensembl transcripts, genes, MANE transcrip
 tark_get_mane_transcripts(gene_identifier="TP53")
 ```
 
-Returns MANE Select and MANE Plus Clinical entries for the gene. If no MANE transcript exists (e.g. non-human genes, older annotations), fall back to:
+Returns MANE Select and MANE Plus Clinical ID pairings for the gene — `ensembl_id` and `refseq_id` (both versioned, e.g. `ENST00000374542.10` ↔ `NM_001141969.2`), `mane_type`, `gene_name`. No coordinates/exons/sequence: pass `ensembl_id` or `refseq_id` to `tark_get_transcript` for those. Filter by gene **symbol** only — Ensembl gene IDs (`ENSG...`) return nothing. If no MANE transcript exists (e.g. non-human genes, older annotations), fall back to:
 
 ```
 tark_get_gene_transcripts(gene_identifier="TP53", assembly="GRCh38")

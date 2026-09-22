@@ -165,9 +165,38 @@ RELEASE_LIST_RAW = [
     }
 ]
 
-MANE_LIST_RESPONSE_RAW = {
-    "count": 1,
-    "next": None,
-    "previous": None,
-    "results": [TRANSCRIPT_BRCA2_RAW],
-}
+# transcript/manelist/ returns a flat, unpaginated list of ID pairs — not transcript records.
+MANE_LIST_RESPONSE_RAW = [
+    {
+        "ens_stable_id": "ENST00000374542",
+        "ens_stable_id_version": "10",
+        "refseq_stable_id": "NM_001141969",
+        "refseq_stable_id_version": "2",
+        "mane_type": "MANE SELECT",
+        "ens_gene_name": "DAXX",
+    },
+    {
+        "ens_stable_id": "ENST00000380152",
+        "ens_stable_id_version": "8",
+        "refseq_stable_id": "NM_000059",
+        "refseq_stable_id_version": "4",
+        "mane_type": "MANE SELECT",
+        "ens_gene_name": "BRCA2",
+    },
+    {
+        "ens_stable_id": "ENST00000302539",
+        "ens_stable_id_version": "9",
+        "refseq_stable_id": "NM_001287174",
+        "refseq_stable_id_version": "3",
+        "mane_type": "MANE PLUS CLINICAL",
+        "ens_gene_name": "ABCC8",
+    },
+    {
+        "ens_stable_id": "ENST00000389817",
+        "ens_stable_id_version": "8",
+        "refseq_stable_id": "NM_000352",
+        "refseq_stable_id_version": "6",
+        "mane_type": "MANE SELECT",
+        "ens_gene_name": "ABCC8",
+    },
+]
