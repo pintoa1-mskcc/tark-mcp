@@ -76,18 +76,23 @@ def _extract_cds_sequence(t: Transcript) -> str | None:
 
 async def _fetch_protein_sequence(
     translation_stable_id: str,
+    translation_version: int,
     assembly: str,
     client: TarkClient,
 ) -> str | None:
-    """Fetch protein sequence from /api/translation/ endpoint."""
+    """Fetch protein sequence from /api/translation/ endpoint.
+
+    The endpoint returns every version of the translation, so pick the one matching
+    the transcript record rather than whichever comes first.
+    """
     data = await client.get("translation/", {
         "stable_id": translation_stable_id,
         "expand_all": "true",
         "assembly_name": assembly,
     })
-    if not data:
+    raw = next((r for r in data if int(r.get("stable_id_version", -1)) == translation_version), None)
+    if raw is None:
         return None
-    raw = data[0]
     seq = raw.get("sequence")
     if isinstance(seq, dict):
         return seq.get("sequence")
@@ -108,7 +113,8 @@ async def _build_diff(
     async def _get_prot(t: Transcript) -> str | None:
         if not t.translations:
             return None
-        return await _fetch_protein_sequence(t.translations[0].stable_id, t.assembly, client)
+        tl = t.translations[0]
+        return await _fetch_protein_sequence(tl.stable_id, tl.stable_id_version, t.assembly, client)
 
     ref_protein_seq, cand_protein_seq = await asyncio.gather(
         _get_prot(ref), _get_prot(candidate)

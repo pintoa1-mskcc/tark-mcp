@@ -3,6 +3,7 @@ import asyncio
 from mcp.server.fastmcp import FastMCP
 
 from tark_mcp.client import TarkClient
+from tark_mcp.models import ManeTranscript
 from tark_mcp.tools.releases import get_releases
 from tark_mcp.tools.transcripts import get_transcript, search_transcripts_by_region, _strip_version
 from tark_mcp.tools.genes import get_gene_transcripts
@@ -82,20 +83,11 @@ async def tark_get_transcripts(
         _client.get("transcript/manelist/"),
     )
 
-    # Build lookup: stable_id (no version) → normalised MANE type label
+    # Build lookup: versioned stable_id → MANE type label
     mane_lookup: dict[str, str] = {}
-    for entry in mane_raw:
-        raw_type = (entry.get("mane_type") or "").upper()
-        if "PLUS CLINICAL" in raw_type:
-            label = "MANE Plus Clinical"
-        elif "SELECT" in raw_type:
-            label = "MANE Select"
-        else:
-            label = raw_type
-        for key in ("ens_stable_id", "refseq_stable_id"):
-            sid = entry.get(key)
-            if sid:
-                mane_lookup[sid] = label
+    for m in (ManeTranscript.model_validate(e) for e in mane_raw):
+        mane_lookup[m.ensembl_id] = m.mane_type
+        mane_lookup[m.refseq_id] = m.mane_type
 
     dicts: list[dict | list[dict] | None] = []
     for result in transcript_results:

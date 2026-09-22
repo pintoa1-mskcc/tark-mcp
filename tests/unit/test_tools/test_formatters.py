@@ -29,3 +29,18 @@ def test_not_found_row_still_includes_note():
     )
     assert "NOT FOUND" in table
     assert "some warning" in table
+
+
+def test_mane_column_requires_matching_version():
+    """MANE pairs are version-specific: ENST00000380152.8 <-> NM_000059.4. A record for
+    another version of the same stable ID (e.g. NM_000059.3, or the fixture's .7) is not MANE."""
+    lookup = {"ENST00000380152.8": "MANE Select", "NM_000059.4": "MANE Select"}
+    v7 = _dump(TRANSCRIPT_BRCA2_RAW)
+    v8 = {**v7, "stable_id_version": 8}
+    table = format_transcripts_table(
+        ["ENST00000380152.7", "ENST00000380152.8"], ["GRCh38", "GRCh38"], [v7, v8],
+        mane_lookup=lookup,
+    )
+    _, _, row_v7, row_v8 = table.splitlines()
+    assert "MANE Select" not in row_v7
+    assert "MANE Select" in row_v8

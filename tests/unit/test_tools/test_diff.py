@@ -448,3 +448,34 @@ async def test_diff_transcripts_version_mismatch_raises():
     ])
     with pytest.raises(ValueError, match="Transcript not found"):
         await diff_transcripts(["ENST00000380152.7", "ENST00000614536"], client=client)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_diff_transcripts_uses_translation_version_from_transcript_record():
+    """translation/ returns every version of an ENSP (older first); the diff must use the
+    version the transcript record points to, not whichever row comes back first.
+    Live case: ENST00000530893.7 -> ENSP00000499438.2 (3295aa), but .1 (481aa) listed first."""
+    client = TarkClient()
+    candidate = {
+        **TRANSCRIPT_CODING_CANDIDATE_RAW,
+        "translations": [{**TRANSCRIPT_CODING_CANDIDATE_RAW["translations"][0],
+                          "stable_id_version": 2}],
+    }
+    multi_version = _page([
+        {**TRANSLATION_CANDIDATE_RAW["results"][0], "stable_id_version": 1,
+         "sequence": {"sequence": "MVL", "seq_checksum": "OLD"}},
+        {**TRANSLATION_CANDIDATE_RAW["results"][0], "stable_id_version": 2,
+         "sequence": {"sequence": "MVLSPAD", "seq_checksum": "NEW"}},
+    ])
+    respx.get(BASE + "transcript/").mock(side_effect=[
+        httpx.Response(200, json=TRANSCRIPT_BRCA2_PAGE),
+        httpx.Response(200, json=_page([candidate])),
+    ])
+    respx.get(BASE + "translation/").mock(side_effect=[
+        httpx.Response(200, json=TRANSLATION_REF_RESPONSE),
+        httpx.Response(200, json=multi_version),
+    ])
+
+    results = await diff_transcripts(["ENST00000380152", "ENST00000614536"], client=client)
+    assert results[0].candidate_protein_sequence == "MVLSPAD"
