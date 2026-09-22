@@ -17,8 +17,9 @@ def format_transcripts_table(
     Columns: Query, Assembly, Stable ID, Ver, Exons, 5'UTR, 3'UTR, CDS (bp),
              AA Len, First Release, Latest Release, Release Date, MANE, Note.
 
-    mane_lookup: optional dict mapping stable ID (no version) → MANE type string,
-                 e.g. {'ENST00000380152': 'MANE SELECT', 'NM_024852': 'MANE SELECT'}
+    mane_lookup: optional dict mapping versioned stable ID → MANE type string,
+                 e.g. {'ENST00000380152.8': 'MANE Select', 'NM_000059.4': 'MANE Select'}.
+                 Versioned because MANE pairs one specific version of each transcript.
     notes: optional per-row warning strings (e.g. flagging that an unversioned query
            resolved to the latest version while an earlier, materially different
            version also exists — see versions.py's describe_divergent_earlier_version).
@@ -57,7 +58,7 @@ def format_transcripts_table(
 
         mane_status = ""
         if mane_lookup:
-            sid = info.get("stable_id", "")
+            sid = f"{info.get('stable_id', '')}.{info.get('stable_id_version', '')}"
             mane_status = mane_lookup.get(sid, "")
 
         rows.append([
