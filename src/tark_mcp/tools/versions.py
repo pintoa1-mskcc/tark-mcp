@@ -74,6 +74,46 @@ async def _fetch_all_versions(
     return transcripts
 
 
+async def describe_divergent_earlier_version(
+    stable_id: str,
+    resolved: Transcript,
+    assembly: str = "GRCh38",
+    client: TarkClient | None = None,
+) -> str:
+    """Warn when an unversioned query silently picked the latest version while an
+    earlier version with different exon/CDS content also exists.
+
+    `get_transcript`/`tark_get_transcripts` resolve an unversioned stable_id to its
+    single most-recently-released version (see transcripts.py's `_deduplicate` +
+    `max(..., key=latest_release_date)`). That's the right default, but it can hide
+    an earlier version that was a materially different annotation rather than just a
+    UTR trim of the same protein — e.g. ENST00000706094.1 (first release Ensembl v108,
+    752 aa) vs. .2 (first release v116, 850 aa): querying the bare stable_id only
+    reports v2's first-release, wrongly implying the stable_id didn't exist before v116.
+
+    Only checks Ensembl (ENST*) IDs — RefSeq version semantics differ and aren't
+    covered by this check.
+
+    Returns a short note describing the earliest divergent version found, or "" when
+    there's nothing to flag (single version, or all versions share the same exon/CDS
+    signature).
+    """
+    if not stable_id.startswith("ENST"):
+        return ""
+    if client is None:
+        client = TarkClient()
+
+    versions = await get_transcript_all_versions(stable_id, assembly, client)
+    resolved_sig = (len(resolved.exons), resolved.cds_seq or "")
+    for v in versions:
+        if v.stable_id_version == resolved.stable_id_version:
+            continue
+        if (len(v.exons), v.cds_seq or "") != resolved_sig:
+            first_release = (v.latest_release_version or "").split(",")[0].strip() or "?"
+            return f"v{v.stable_id_version} differs (first release {first_release})"
+    return ""
+
+
 async def get_transcript_version_history(
     stable_id: str,
     assembly: str = "GRCh38",

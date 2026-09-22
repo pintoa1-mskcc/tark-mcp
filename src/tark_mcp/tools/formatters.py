@@ -10,24 +10,30 @@ def format_transcripts_table(
     assemblies: list[str],
     results: list[dict | list[dict] | None],
     mane_lookup: dict[str, str] | None = None,
+    notes: list[str] | None = None,
 ) -> str:
     """Format tark_get_transcripts results as a human-readable summary table.
 
     Columns: Query, Assembly, Stable ID, Ver, Exons, 5'UTR, 3'UTR, CDS (bp),
-             AA Len, First Release, Latest Release, Release Date, MANE.
+             AA Len, First Release, Latest Release, Release Date, MANE, Note.
 
     mane_lookup: optional dict mapping stable ID (no version) → MANE type string,
                  e.g. {'ENST00000380152': 'MANE SELECT', 'NM_024852': 'MANE SELECT'}
+    notes: optional per-row warning strings (e.g. flagging that an unversioned query
+           resolved to the latest version while an earlier, materially different
+           version also exists — see versions.py's describe_divergent_earlier_version).
     """
     COL_HEADERS = [
         "Query", "Assembly", "Stable ID", "Ver", "Exons",
         "5'UTR", "3'UTR", "CDS (bp)", "AA Len",
-        "First Release", "Latest Release", "Release Date", "MANE",
+        "First Release", "Latest Release", "Release Date", "MANE", "Note",
     ]
-    COL_WIDTHS = [24, 10, 20, 5, 7, 8, 8, 10, 8, 22, 22, 14, 20]
+    COL_WIDTHS = [24, 10, 20, 5, 7, 8, 8, 10, 8, 22, 22, 14, 20, 40]
 
     rows: list[list] = []
-    for query, assembly, result in zip(stable_ids, assemblies, results):
+    for i, (query, assembly, result) in enumerate(zip(stable_ids, assemblies, results)):
+        note = notes[i] if notes and i < len(notes) else ""
+
         info: dict | None = None
         if isinstance(result, list):
             info = result[0] if result else None
@@ -35,7 +41,7 @@ def format_transcripts_table(
             info = result
 
         if info is None:
-            rows.append([query, assembly, "NOT FOUND", "", "", "", "", "", "", "", "", "", ""])
+            rows.append([query, assembly, "NOT FOUND", "", "", "", "", "", "", "", "", "", "", note])
             continue
 
         exon_count = len(info.get("exons") or [])
@@ -68,6 +74,7 @@ def format_transcripts_table(
             last_rel,
             release_date,
             mane_status,
+            note,
         ])
 
     header_line = _fmt_row(COL_HEADERS, COL_WIDTHS)
