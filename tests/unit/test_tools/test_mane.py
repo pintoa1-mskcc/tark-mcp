@@ -4,7 +4,7 @@ import respx
 
 from tark_mcp.client import TarkClient
 from tark_mcp.tools.mane import get_mane_transcripts
-from tests.conftest import TRANSCRIPT_BRCA2_RAW, MANE_LIST_RESPONSE_RAW
+from tests.conftest import MANE_LIST_RESPONSE_RAW
 
 BASE = "https://tark.ensembl.org/api/"
 
@@ -17,38 +17,42 @@ async def test_get_mane_transcripts_returns_all():
         return_value=httpx.Response(200, json=MANE_LIST_RESPONSE_RAW)
     )
     results = await get_mane_transcripts(client=client)
-    assert len(results) == 1
-    assert results[0].stable_id == "ENST00000380152"
+    assert len(results) == 4
 
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_get_mane_transcripts_filters_by_gene_name():
-    client = TarkClient()
-    two_genes = {
-        "count": 2, "next": None, "previous": None,
-        "results": [
-            TRANSCRIPT_BRCA2_RAW,
-            {**TRANSCRIPT_BRCA2_RAW, "stable_id": "ENST00000999999",
-             "genes": [{"stable_id": "ENSG00000012048", "stable_id_version": 1,
-                        "assembly": "GRCh38", "loc_start": 100, "loc_end": 200,
-                        "loc_strand": 1, "loc_region": "1", "name": "BRCA1"}]},
-        ],
-    }
-    respx.get(BASE + "transcript/manelist/").mock(
-        return_value=httpx.Response(200, json=two_genes)
-    )
-    results = await get_mane_transcripts(gene_identifier="BRCA2", client=client)
-    assert len(results) == 1
-    assert results[0].stable_id == "ENST00000380152"
-
-
-@respx.mock
-@pytest.mark.asyncio
-async def test_get_mane_transcripts_filters_by_gene_stable_id():
+async def test_get_mane_transcripts_parses_raw_entry():
     client = TarkClient()
     respx.get(BASE + "transcript/manelist/").mock(
         return_value=httpx.Response(200, json=MANE_LIST_RESPONSE_RAW)
     )
-    results = await get_mane_transcripts(gene_identifier="ENSG00000139618", client=client)
+    results = await get_mane_transcripts(gene_identifier="DAXX", client=client)
     assert len(results) == 1
+    m = results[0]
+    assert m.ensembl_id == "ENST00000374542.10"
+    assert m.refseq_id == "NM_001141969.2"
+    assert m.mane_type == "MANE Select"
+    assert m.gene_name == "DAXX"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_mane_transcripts_filters_by_gene_name_case_insensitive():
+    client = TarkClient()
+    respx.get(BASE + "transcript/manelist/").mock(
+        return_value=httpx.Response(200, json=MANE_LIST_RESPONSE_RAW)
+    )
+    results = await get_mane_transcripts(gene_identifier="abcc8", client=client)
+    assert {m.mane_type for m in results} == {"MANE Select", "MANE Plus Clinical"}
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_mane_transcripts_unknown_gene_returns_empty():
+    client = TarkClient()
+    respx.get(BASE + "transcript/manelist/").mock(
+        return_value=httpx.Response(200, json=MANE_LIST_RESPONSE_RAW)
+    )
+    results = await get_mane_transcripts(gene_identifier="NOTAGENE", client=client)
+    assert results == []

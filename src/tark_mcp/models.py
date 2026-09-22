@@ -166,6 +166,33 @@ class Release(BaseModel):
     source: str
 
 
+class ManeTranscript(BaseModel):
+    """One entry from transcript/manelist/: an Ensembl <-> RefSeq MANE pairing (IDs only)."""
+    ensembl_id: str
+    refseq_id: str
+    mane_type: str
+    gene_name: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize(cls, data: dict) -> dict:
+        if "ens_stable_id" not in data:
+            return data
+        raw_type = (data.get("mane_type") or "").upper()
+        if "PLUS CLINICAL" in raw_type:
+            mane_type = "MANE Plus Clinical"
+        elif "SELECT" in raw_type:
+            mane_type = "MANE Select"
+        else:
+            mane_type = raw_type
+        return {
+            "ensembl_id": f"{data['ens_stable_id']}.{data['ens_stable_id_version']}",
+            "refseq_id": f"{data['refseq_stable_id']}.{data['refseq_stable_id_version']}",
+            "mane_type": mane_type,
+            "gene_name": data.get("ens_gene_name"),
+        }
+
+
 class ExonDiff(BaseModel):
     order: int
     change: str  # "added", "removed", "modified", "unchanged"

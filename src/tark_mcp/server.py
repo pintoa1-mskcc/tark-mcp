@@ -4,13 +4,14 @@ from mcp.server.fastmcp import FastMCP
 
 from tark_mcp.client import TarkClient
 from tark_mcp.tools.releases import get_releases
-from tark_mcp.tools.transcripts import get_transcript, search_transcripts_by_region
+from tark_mcp.tools.transcripts import get_transcript, search_transcripts_by_region, _strip_version
 from tark_mcp.tools.genes import get_gene_transcripts
 from tark_mcp.tools.sequences import (
     get_transcript_sequence, get_transcript_exons, get_protein_for_transcript
 )
 from tark_mcp.tools.mane import get_mane_transcripts
 from tark_mcp.tools.diff import diff_transcripts
+from tark_mcp.tools.versions import describe_divergent_earlier_version
 from tark_mcp.tools.formatters import format_transcripts_table
 
 mcp = FastMCP("tark")
@@ -105,7 +106,26 @@ async def tark_get_transcripts(
         else:
             dicts.append(result.model_dump())
 
-    return format_transcripts_table(expanded_queries, expanded_assemblies, dicts, mane_lookup=mane_lookup)
+    notes = await asyncio.gather(*[
+        _version_note(sid, asm, result)
+        for sid, asm, result in zip(expanded_queries, expanded_assemblies, transcript_results)
+    ])
+
+    return format_transcripts_table(
+        expanded_queries, expanded_assemblies, dicts, mane_lookup=mane_lookup, notes=list(notes)
+    )
+
+
+async def _version_note(stable_id: str, assembly: str, result) -> str:
+    """Flag unversioned queries that resolved to the latest version while an earlier,
+    materially different version also exists (see versions.py for the DAXX/ENST00000706094
+    case this guards against)."""
+    if result is None or isinstance(result, list):
+        return ""
+    sid, version = _strip_version(stable_id)
+    if version is not None:
+        return ""  # caller pinned an exact version; no ambiguity to flag
+    return await describe_divergent_earlier_version(sid, result, assembly, _client)
 
 
 @mcp.tool()
@@ -183,10 +203,14 @@ async def tark_get_protein_for_transcript(
 
 @mcp.tool()
 async def tark_get_mane_transcripts(gene_identifier: str | None = None) -> list[dict]:
-    """Return MANE Select and MANE Plus Clinical transcripts, optionally filtered by gene.
+    """Return MANE Select and MANE Plus Clinical Ensembl <-> RefSeq pairings, optionally filtered by gene.
+
+    Each entry is IDs only: ensembl_id and refseq_id (both versioned), mane_type, gene_name.
+    Use tark_get_transcript on ensembl_id/refseq_id for coordinates, exons and sequence.
 
     Args:
-        gene_identifier: Optional gene symbol or Ensembl gene ID to filter results
+        gene_identifier: Optional gene symbol (e.g. "TP53", case-insensitive) to filter results.
+            Ensembl gene IDs are not supported — the MANE endpoint carries symbols only.
     """
     results = await get_mane_transcripts(gene_identifier=gene_identifier, client=_client)
     return [t.model_dump() for t in results]
