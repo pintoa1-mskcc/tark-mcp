@@ -8,7 +8,7 @@ from tark_mcp.tools.releases import get_releases
 from tark_mcp.tools.transcripts import get_transcript, search_transcripts_by_region, _strip_version
 from tark_mcp.tools.genes import get_gene_transcripts
 from tark_mcp.tools.sequences import (
-    get_transcript_sequence, get_transcript_exons, get_protein_for_transcript
+    get_protein_length, get_transcript_sequence, get_transcript_exons, get_protein_for_transcript
 )
 from tark_mcp.tools.mane import get_mane_transcripts
 from tark_mcp.tools.diff import diff_transcripts
@@ -98,14 +98,27 @@ async def tark_get_transcripts(
         else:
             dicts.append(result.model_dump())
 
-    notes = await asyncio.gather(*[
-        _version_note(sid, asm, result)
-        for sid, asm, result in zip(expanded_queries, expanded_assemblies, transcript_results)
-    ])
+    notes, protein_lengths = await asyncio.gather(
+        asyncio.gather(*[
+            _version_note(sid, asm, result)
+            for sid, asm, result in zip(expanded_queries, expanded_assemblies, transcript_results)
+        ]),
+        asyncio.gather(*[_protein_length(result) for result in transcript_results]),
+    )
 
     return format_transcripts_table(
-        expanded_queries, expanded_assemblies, dicts, mane_lookup=mane_lookup, notes=list(notes)
+        expanded_queries, expanded_assemblies, dicts, mane_lookup=mane_lookup, notes=list(notes),
+        protein_lengths=list(protein_lengths),
     )
+
+
+async def _protein_length(result) -> int | None:
+    """Actual translation length for the row the table shows (first record if a list)."""
+    if isinstance(result, list):
+        result = result[0] if result else None
+    if result is None:
+        return None
+    return await get_protein_length(result, _client)
 
 
 async def _version_note(stable_id: str, assembly: str, result) -> str:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from tark_mcp.client import TarkClient
-from tark_mcp.models import Exon, Translation
+from tark_mcp.models import Exon, Transcript, Translation
+from tark_mcp.tools.diff import _fetch_protein_sequence
 from tark_mcp.tools.transcripts import get_transcript
 
 
@@ -58,3 +59,15 @@ async def get_protein_for_transcript(
         results = [x.translations[0] if x.translations else None for x in t]
         return results
     return t.translations[0] if t.translations else None
+
+
+async def get_protein_length(transcript: Transcript, client: TarkClient) -> int | None:
+    """Length of the transcript's actual translation, or None if it has none.
+
+    Not derived from the CDS: that arithmetic breaks for 5'-incomplete or stopless CDSs.
+    """
+    if not transcript.translations:
+        return None
+    tl = transcript.translations[0]
+    seq = await _fetch_protein_sequence(tl.stable_id, tl.stable_id_version, transcript.assembly, client)
+    return len(seq) if seq else None

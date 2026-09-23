@@ -44,3 +44,22 @@ def test_mane_column_requires_matching_version():
     _, _, row_v7, row_v8 = table.splitlines()
     assert "MANE Select" not in row_v7
     assert "MANE Select" in row_v8
+
+
+def _aa_len_cell(table: str) -> str:
+    header, _, row = table.splitlines()
+    start = header.index("AA Len")
+    return row[start:start + 8].strip()
+
+
+def test_aa_len_uses_protein_length_when_given():
+    """CDS-derived length is wrong for incomplete CDSs; the real protein length wins."""
+    table = format_transcripts_table(
+        ["ENST00000380152"], ["GRCh38"], [_dump(TRANSCRIPT_BRCA2_RAW)], protein_lengths=[3418],
+    )
+    assert _aa_len_cell(table) == "3418"
+
+
+def test_aa_len_is_na_without_protein_length():
+    table = format_transcripts_table(["ENST00000380152"], ["GRCh38"], [_dump(TRANSCRIPT_BRCA2_RAW)])
+    assert _aa_len_cell(table) == "N/A"
