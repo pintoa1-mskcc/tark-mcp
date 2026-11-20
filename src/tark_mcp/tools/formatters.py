@@ -11,6 +11,7 @@ def format_transcripts_table(
     results: list[dict | list[dict] | None],
     mane_lookup: dict[str, str] | None = None,
     notes: list[str] | None = None,
+    protein_lengths: list[int | None] | None = None,
 ) -> str:
     """Format tark_get_transcripts results as a human-readable summary table.
 
@@ -23,6 +24,8 @@ def format_transcripts_table(
     notes: optional per-row warning strings (e.g. flagging that an unversioned query
            resolved to the latest version while an earlier, materially different
            version also exists — see versions.py's describe_divergent_earlier_version).
+    protein_lengths: optional per-row length of the actual translation; AA Len shows "N/A"
+                     without one (CDS arithmetic is wrong for incomplete CDSs).
     """
     COL_HEADERS = [
         "Query", "Assembly", "Stable ID", "Ver", "Exons",
@@ -48,7 +51,8 @@ def format_transcripts_table(
         exon_count = len(info.get("exons") or [])
         cds_seq = info.get("cds_seq") or ""
         cds_len: int | str = len(cds_seq) if cds_seq else "N/A"
-        aa_len: int | str = (len(cds_seq) // 3) - 1 if cds_seq else "N/A"
+        protein_len = protein_lengths[i] if protein_lengths and i < len(protein_lengths) else None
+        aa_len: int | str = protein_len if protein_len is not None else "N/A"
 
         rel_str = info.get("latest_release_version") or ""
         parts = [p.strip() for p in rel_str.split(",") if p.strip()]

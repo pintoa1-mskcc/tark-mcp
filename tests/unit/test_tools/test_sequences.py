@@ -93,3 +93,28 @@ async def test_get_protein_for_noncoding_returns_none():
     respx.get(BASE + "transcript/").mock(return_value=httpx.Response(200, json=NONCODING_RESULT))
     result = await get_protein_for_transcript("ENST00000614536", client=client)
     assert result is None
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_protein_length_uses_translation_not_cds_arithmetic():
+    """AA length must come from the translation record: CDS arithmetic (len // 3 - 1) is wrong
+    for 5'-incomplete / stopless CDSs (e.g. RYBP ENST00000628983.2: CDS 684 bp, protein 228 aa)."""
+    from tark_mcp.models import Transcript
+    from tark_mcp.tools.sequences import get_protein_length
+    client = TarkClient()
+    t = Transcript.model_validate(TRANSCRIPT_BRCA2_RAW)
+    older = {**TRANSLATION_BRCA2_RAW, "stable_id_version": 2,
+             "sequence": {"sequence": "MP", "seq_checksum": "OLD"}}
+    respx.get(BASE + "translation/").mock(return_value=httpx.Response(200, json={
+        "count": 2, "next": None, "previous": None, "results": [older, TRANSLATION_BRCA2_RAW],
+    }))
+    assert await get_protein_length(t, client=client) == len("MPIGSKERP")
+
+
+@pytest.mark.asyncio
+async def test_get_protein_length_none_for_noncoding():
+    from tark_mcp.models import Transcript
+    from tark_mcp.tools.sequences import get_protein_length
+    t = Transcript.model_validate(TRANSCRIPT_NONCODING_RAW)
+    assert await get_protein_length(t, client=TarkClient()) is None
